@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang=en-US>
+<meta charset=utf-8>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MVS</title>
+
+<script src=sql-wasm.js></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/light.css">
+
+<style>
+body {
+    max-width: 80%;
+}
+table {
+    table-layout: auto;
+}
+.table-container {
+    overflow-x: scroll;
+}
+input[type=search] {
+    width: 100%;
+}
+/* make filenames monospace */
+.mono {
+    font-family: monospace;
+    white-space: nowrap;
+}
+tr > td {
+    vertical-align: middle;
+}
+tr > td > input {
+    margin: revert;
+}
+</style>
+
+<header>
+    <h1>
+        MVS dump
+    </h1>
+    <hr>
+</header>
+<main>
+    <blockquote>
+        This does not infringe on anyone's copyright.<br>
+        Information stored and displayed here does not constitute copyrighted material - only describes it.<br>
+        No one earns any money from this. Additionally, it does not conflict with even a single word of the Visual Studio EULA.<br>
+        <p>If you're here from the BSA to complain - fuck right off.</p>
+        <footer><cite>The Legalese Retardation Ward</cite></footer>
+    </blockquote>
+    <hr>
+    <h2>How to use?</h2>
+    <ol>
+        <li>Type in search query in <b>Search Products</b>.
+        <li>Click <b>Browse Files</b> to search through the files of <b>the above products</b>.
+    </ol>
+
+    <h2>Example:</h2>
+    <ol>
+        <li> Type <kbd>Windows 10 consumer updated May 2022</kbd> into the search bar.
+        <li> Open the <b>Browse Files</b> section and type in <kbd>en-us x64</kbd>
+    </ol>
+    <hr>
+    <details open>
+        <summary>
+            1. Select Products
+        </summary>
+        <form id=product-form onsubmit="return false">
+            <label for=searchbar-p>Search keywords:</label>
+            <input id=searchbar-p type="search">
+        </form>
+        <table id=products>
+            <thead>
+                <tr>
+                    <th>&checkmark;</th>
+                    <th>ID
+                    <th>Product Name
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </details>
+    <details>
+        <summary>
+            2. Browse Files
+        </summary>
+        <form id=file-form onsubmit="return false">
+            <label for=searchbar-f>Search keywords:</label>
+            <input id=searchbar-f type=search>
+        </form>
+        <div class=table-container>
+            <table id=files>
+                <thead>
+                    <tr>
+                        <th>Product ID
+                        <th>File name
+                        <th>SHA1
+                        <th>SHA256
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </details>
+</main>
+<footer>
+    Made for <b>the Glory of Cthulhu</b>
+</footer>
+
+<script>
+// Makes writing a bit less painful
+$  = s => document.querySelector(s);
+$a = s => document.querySelectorAll(s);
+n$ = e => document.createElement(e);
+
+// Initialize DB engine
+const xhr = new XMLHttpRequest();
+xhr.open('GET', 'mvs.sqlite', true);
+xhr.responseType = 'arraybuffer';
+
+initSqlJs().then(function(SQL){
+    xhr.onload = (e) => {
+
+        const uInt8Array = new Uint8Array(xhr.response);
+        db = new SQL.Database(uInt8Array);
+        
+        db.create_function('regexp', (str, exp) => str.match(exp));
+
+        // Update product list on updated search terms
+        // onkeypress is used instead of onchange or onsearch
+        // because onchange will not trigger on no change or
+        // when the searchbar state is preserved betwen refreshes
+        // and onsearch is not supported on most browsers.
+        let product_bar = $('#searchbar-p');
+        product_bar.onkeypress = (e) => {
+
+            if(!e.code.endsWith('Enter'))
+                return;
+            
+            // Build Query
+            // Replace '+' with ' ' to allow searching "ordered" phrases
+            let query = e.target.value.split(' ').reduce(
+                (a, x) => a + ' AND name LIKE "%' + x.replaceAll('+', ' ') + '%"',
+                'SELECT id, name FROM products WHERE 1'
+            );
+            
+            let products = db.exec(query);
+
+            // [Thank you committee geniuses for the lack of a parent selector in CSS]
+            for (const x of $a('#products input:not(:checked)')) {
+                x.parentElement.parentElement.remove();
+            }
+
+            // Construct a rows fragment and append it the product list
+            $('#products>tbody').appendChild(products[0].values.reduce(
+                (a, x) => {
+                    let row = n$('tr');
+                    let checkbox = n$('input');
+                    checkbox.id = x[0];
+                    checkbox.setAttribute('type', 'checkbox');
+
+                    let checkbox_td = n$('td'); checkbox_td.appendChild(checkbox);
+                    row.appendChild(checkbox_td);
+
+                    for (const field of x) {
+                        let tdata = n$('td');
+                        tdata.textContent = field;
+                        row.appendChild(tdata);
+                    }
+                    a.appendChild(row);
+                    return a;
+                },
+                document.createDocumentFragment()
+            ));
+            
+            // Update the file list for products
+
+            let file_list = $('#files>tbody');
+            file_list.innerHTML = '';
+            // TODO same thing
+
+            // Set the file searchbar listener
+            $('#searchbar-f').onkeypress = (e) => {
+                
+                if(!e.code.endsWith('Enter'))
+                    return;
+                
+                // Do not update search results if the Browse Files prompt is closed
+                if(!e.target.parentElement.parentElement.open)
+                    return;
+
+                file_list.innerHTML = '';
+
+                let selected_ids = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).reduce(
+                    (a, x) => {
+                        a.push(x.id);
+                        return a;
+                    },
+                    []
+                );
+
+                let query = e.target.value.split(' ').reduce(
+                    (a, x) => a + ' AND name LIKE "%' + x + '%"',
+                    'SELECT product, name, sha1, sha2 FROM files WHERE product IN (' + selected_ids.join() + ')'
+                ) + ' ORDER BY product DESC;';
+
+                let files = db.exec(query);
+
+                part = document.createDocumentFragment();
+                for (const row of files[0].values) {
+                    let r = n$('tr');
+                    
+                    for (const x of row) {
+                        let d = n$('td');
+                        d.textContent = x;
+                        d.classList.add('mono');
+                        r.appendChild(d);
+                    }
+                    part.appendChild(r);
+                }
+                file_list.appendChild(part);
+            };
+            // file_bar.onchange({target:{value:''}});
+        };
+    };
+    xhr.send();
+});
+</script>
