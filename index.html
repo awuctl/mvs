@@ -31,6 +31,14 @@ tr > td {
 tr > td > input {
     margin: revert;
 }
+#loading {
+  animation: ps 2s linear infinite;
+}
+@keyframes ps {
+  50% {
+    opacity: 20%;
+  }
+}
 </style>
 
 <header>
@@ -60,7 +68,9 @@ tr > td > input {
         <li> Open the <b>Browse Files</b> section and type in <kbd>en-us x64</kbd>
     </ol>
     <hr>
-    <details open>
+    <h1 id=loading>Loading database.. Please wait..</h1>
+    <!-- display:none until the DB is downloaded.. -->
+    <details open style='display: none'>
         <summary>
             1. Select Products
         </summary>
@@ -79,7 +89,7 @@ tr > td > input {
             </tbody>
         </table>
     </details>
-    <details>
+    <details style='display: none'>
         <summary>
             2. Browse Files
         </summary>
@@ -118,6 +128,9 @@ xhr.responseType = 'arraybuffer';
 
 initSqlJs().then(function(SQL){
     xhr.onload = (e) => {
+
+        $('#loading').remove()
+        $a('details').forEach(e=>e.style='')
 
         const uInt8Array = new Uint8Array(xhr.response);
         db = new SQL.Database(uInt8Array);
