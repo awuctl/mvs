@@ -213,7 +213,7 @@ initSqlJs().then(function(SQL){
                 let query = e.target.value.split(' ').reduce(
                     (a, x) => a + ' AND name LIKE "%' + x + '%"',
                     'SELECT product, name, sha1, sha2 FROM files WHERE product IN (' + selected_ids.join() + ')'
-                ) + ' ORDER BY product DESC;';
+                ) + ' ORDER BY product DESC, name ASC;';
 
                 let files = db.exec(query);
 
