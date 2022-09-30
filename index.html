@@ -70,7 +70,7 @@ tr > td > input {
     <hr>
     <h1 id=loading>Loading database.. Please wait..</h1>
     <!-- display:none until the DB is downloaded.. -->
-    <details open style='display: none'>
+    <details open style=display:none>
         <summary>
             1. Select Products
         </summary>
@@ -89,7 +89,7 @@ tr > td > input {
             </tbody>
         </table>
     </details>
-    <details style='display: none'>
+    <details style=display:none>
         <summary>
             2. Browse Files
         </summary>
@@ -110,16 +110,80 @@ tr > td > input {
             </table>
         </div>
     </details>
+    <details style=display:none>
+        <summary>3. Generate summary files</summary>
+        <form id=generator-form>
+
+            <p>This allows you to generate a checksum file for <b>selected products</b>.</p>
+
+            <fieldset>
+                <legend>Choose preset summary:</legend>
+                <input id=gen-rad-1 type=radio name=preset value=sha2>
+                <label for=gen-rad-1>SHA256 file (for <code>sha256sum</code> or similar)</label><br>
+
+                <input id=gen-rad-2 type=radio name=preset value=sha1>
+                <label for=gen-rad-2>SHA128 file (for <code>sha1sum</code> or similar)</label><br>
+
+                <input id=gen-rad-3 type=radio name=preset value=sha checked>
+                <label for="gen-rad-3">Mixed SHA checksum file (sha2 OR sha1 for each file, sha2 preferred)</label><br>
+
+                <input type=submit id=generator-submit value=Generate>
+            </fieldset>
+        </form>
+    </details>
+
 </main>
 <footer>
     Made for <b>the Glory of Cthulhu</b>
 </footer>
 
 <script>
-// Makes writing a bit less painful
+    // {{{ Helper functions
 $  = s => document.querySelector(s);
 $a = s => document.querySelectorAll(s);
 n$ = e => document.createElement(e);
+
+    get_selected_product_ids = () => Array.from(document.querySelectorAll('input[type=checkbox]:checked')).reduce(
+        (a, x) => {
+            a.push(x.id);
+            return a;
+        },
+        []
+    );
+
+    function build_product_query(search_string) {
+        // Regex search
+        if (search_string.match(/\/.*\//))
+            return 'SELECT id, name FROM products WHERE regexp(name, "' + search_string.slice(1, -1) + '") is not null;'
+
+        // Splits by spaces (for non-exact matches)
+        // Replaces '+' with ' ' to force exact matches
+        return search_string.split(' ').reduce(
+            (a, x) => a + ' AND name LIKE "%' + x.replaceAll('+', ' ') + '%"',
+            'SELECT id, name FROM products WHERE 1'
+        );
+    }
+
+    // fields: product, name, sha1, sha2
+    build_file_query = (search_string, fields, products) => search_string.split(' ').reduce(
+        (a, x) => a + ' AND name LIKE "%' + x + '%"',
+        'SELECT ' + fields.join() + ' FROM files WHERE product IN (' + products.join() + ')'
+    ) + ' ORDER BY product DESC, name ASC;';
+
+    download = (name, content) => {
+        let e = n$('a');
+        e.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+        e.setAttribute('download', name);
+        e.style.display = 'none';
+        document.body.appendChild(e);
+        e.click();
+        document.body.removeChild(e);
+    }
+
+    // Helper functions }}}
+</script>
+
+<script>
 
 // Initialize DB engine
 const xhr = new XMLHttpRequest();
@@ -134,29 +198,63 @@ initSqlJs().then(function(SQL){
 
         const uInt8Array = new Uint8Array(xhr.response);
         db = new SQL.Database(uInt8Array);
-        
         db.create_function('regexp', (str, exp) => str.match(exp));
+
+        // register handler for summary generation
+        $('#generator-form').addEventListener('submit', (e) => {
+            if(e.preventDefault) e.preventDefault();
+
+            let fmt = $('#generator-form > fieldset > input[type=radio]:checked').value
+
+            console.log(fmt, 'fmt')
+        
+            let prods = db.exec('SELECT id, name FROM products WHERE id IN (' + get_selected_product_ids().join() + ') ORDER BY id ASC;' );
+            out = ''
+
+            for (const p_row of prods[0].values) {
+                out += '# ' + p_row[1] + ' [' + p_row[0] + ']\n';
+
+                let fields = ['name'];
+                if(fmt == 'sha'){
+                    fields.push('sha1');
+                    fields.push('sha2');
+                } else fields.push(fmt);
+
+                let files = db.exec(build_file_query('', fields, [p_row[0]]));
+                for (const f_row of files[0].values) {
+                    if (fmt == 'sha') {
+                        if(!f_row[2]) { // no sha2
+                            if(f_row[1])
+                                out += f_row[1].toLowerCase() + ' *' + f_row[0] + '\n';
+                            else
+                                continue
+                        } else
+                            out += f_row[2].toLowerCase() + ' *' + f_row[0] + '\n';
+                    } else {
+                        if(!f_row[1])
+                            continue; // likely nothing else in the product will have it, but it's still microsoft
+                        out += f_row[1].toLowerCase() + ' *' + f_row[0] + '\n';
+                    }
+                }
+                out += '\n';
+            }
+            download('products.' + fmt, out);
+
+            return false;
+        });
 
         // Update product list on updated search terms
         // onkeypress is used instead of onchange or onsearch
         // because onchange will not trigger on no change or
         // when the searchbar state is preserved betwen refreshes
         // and onsearch is not supported on most browsers.
-        let product_bar = $('#searchbar-p');
-        product_bar.onkeypress = (e) => {
+
+        $('#searchbar-p').addEventListener('keypress', (e) => {
 
             if(!e.code.endsWith('Enter'))
                 return;
-            
-            // Build Query
-            // Replace '+' with ' ' to allow searching "ordered" phrases
-            let query = e.target.value.split(' ').reduce(
-                (a, x) => a + ' AND name LIKE "%' + x.replaceAll('+', ' ') + '%"',
-                'SELECT id, name FROM products WHERE 1'
-            );
-            
-            let products = db.exec(query);
 
+            let products = db.exec(build_product_query(e.target.value));
             // [Thank you committee geniuses for the lack of a parent selector in CSS]
             for (const x of $a('#products input:not(:checked)')) {
                 x.parentElement.parentElement.remove();
@@ -188,34 +286,18 @@ initSqlJs().then(function(SQL){
 
             let file_list = $('#files>tbody');
             file_list.innerHTML = '';
-            // TODO same thing
 
             // Set the file searchbar listener
-            $('#searchbar-f').onkeypress = (e) => {
+            $('#searchbar-f').addEventListener('keypress', (e) => {
                 
                 if(!e.code.endsWith('Enter'))
                     return;
-                
                 // Do not update search results if the Browse Files prompt is closed
                 if(!e.target.parentElement.parentElement.open)
                     return;
-
                 file_list.innerHTML = '';
 
-                let selected_ids = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).reduce(
-                    (a, x) => {
-                        a.push(x.id);
-                        return a;
-                    },
-                    []
-                );
-
-                let query = e.target.value.split(' ').reduce(
-                    (a, x) => a + ' AND name LIKE "%' + x + '%"',
-                    'SELECT product, name, sha1, sha2 FROM files WHERE product IN (' + selected_ids.join() + ')'
-                ) + ' ORDER BY product DESC, name ASC;';
-
-                let files = db.exec(query);
+                let files = db.exec(build_file_query(e.target.value, ['product', 'name', 'sha1', 'sha2'], get_selected_product_ids()));
 
                 part = document.createDocumentFragment();
                 for (const row of files[0].values) {
@@ -230,9 +312,8 @@ initSqlJs().then(function(SQL){
                     part.appendChild(r);
                 }
                 file_list.appendChild(part);
-            };
-            // file_bar.onchange({target:{value:''}});
-        };
+            })
+        });
     };
     xhr.send();
 });
