@@ -139,9 +139,9 @@ tr > td > input {
 
 <script>
     // {{{ Helper functions
-$  = s => document.querySelector(s);
-$a = s => document.querySelectorAll(s);
-n$ = e => document.createElement(e);
+    $  = s => document.querySelector(s);
+    $a = s => document.querySelectorAll(s);
+    n$ = e => document.createElement(e);
 
     get_selected_product_ids = () => Array.from(document.querySelectorAll('input[type=checkbox]:checked')).reduce(
         (a, x) => {
@@ -207,7 +207,7 @@ initSqlJs().then(function(SQL){
             let fmt = $('#generator-form > fieldset > input[type=radio]:checked').value
 
             console.log(fmt, 'fmt')
-        
+
             let prods = db.exec('SELECT id, name FROM products WHERE id IN (' + get_selected_product_ids().join() + ') ORDER BY id ASC;' );
             out = ''
 
@@ -281,7 +281,7 @@ initSqlJs().then(function(SQL){
                 },
                 document.createDocumentFragment()
             ));
-            
+
             // Update the file list for products
 
             let file_list = $('#files>tbody');
@@ -289,7 +289,7 @@ initSqlJs().then(function(SQL){
 
             // Set the file searchbar listener
             $('#searchbar-f').addEventListener('keypress', (e) => {
-                
+
                 if(!e.code.endsWith('Enter'))
                     return;
                 // Do not update search results if the Browse Files prompt is closed
@@ -302,7 +302,7 @@ initSqlJs().then(function(SQL){
                 part = document.createDocumentFragment();
                 for (const row of files[0].values) {
                     let r = n$('tr');
-                    
+
                     for (const x of row) {
                         let d = n$('td');
                         d.textContent = x;
