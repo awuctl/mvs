@@ -4,7 +4,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MVS</title>
 
-<script src=sql-wasm.js></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js" integrity="sha512-n7swEtVCvXpQ7KxgpPyp0+DQQEf5vPpmzCRl14x2sp2v5LpCYCjrAx03mkBAbWwGF9eUoIk8YVcDFuJRIeYttg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/light.css">
 
 <style>
@@ -187,16 +189,18 @@ tr > td > input {
 
 // Initialize DB engine
 const xhr = new XMLHttpRequest();
-xhr.open('GET', 'mvs.sqlite', true);
+xhr.open('GET', 'mvs.sqlite.gz', true);
 xhr.responseType = 'arraybuffer';
 
-initSqlJs().then(function(SQL){
+initSqlJs({
+    locateFile: file => "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/" + file
+}).then(function(SQL){
     xhr.onload = (e) => {
 
         $('#loading').remove()
         $a('details').forEach(e=>e.style='')
 
-        const uInt8Array = new Uint8Array(xhr.response);
+        const uInt8Array = pako.ungzip(xhr.response);
         db = new SQL.Database(uInt8Array);
         db.create_function('regexp', (str, exp) => str.match(exp));
 
