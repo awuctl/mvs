@@ -169,7 +169,7 @@ tr > td > input {
     // fields: product, name, sha1, sha2
     build_file_query = (search_string, fields, products) => search_string.split(' ').reduce(
         (a, x) => a + ' AND name LIKE "%' + x + '%"',
-        'SELECT ' + fields.join() + ' FROM files WHERE product IN (' + products.join() + ') AND (sha1 OR sha2)'
+        'SELECT ' + fields.join() + ' FROM files WHERE product IN (' + products.join() + ') AND ((sha1 IS NOT NULL) OR (sha2 IS NOT NULL))'
     ) + ' ORDER BY product DESC, name ASC;';
 
     download = (name, content) => {
