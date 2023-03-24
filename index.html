@@ -163,7 +163,7 @@ tr > td > input {
         return search_string.split(' ').reduce(
             (a, x) => a + ' AND name LIKE "%' + x.replaceAll('+', ' ') + '%"',
             'SELECT id, name FROM products WHERE 1'
-        );
+        ) + ' ORDER BY id DESC;';
     }
 
     // fields: product, name, sha1, sha2
