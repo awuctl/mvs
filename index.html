@@ -225,6 +225,8 @@ initSqlJs({
                 } else fields.push(fmt);
 
                 let files = db.exec(build_file_query('', fields, [p_row[0]]));
+                if(files[0] === undefined)
+                    continue;
                 for (const f_row of files[0].values) {
                     if (fmt == 'sha') {
                         if(!f_row[2]) { // no sha2
