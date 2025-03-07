@@ -1,6 +1,6 @@
 # MVS SQL database frontend
 
-This is designed to work in conjunction with dumps made by [this](https://github.com/Gamers-Against-Weed/mvs-dump) tool.
+This is designed to work in conjunction with dumps made by [this](https://github.com/ave9858/mvs-dump) tool.
 
 Keep in mind that this does not work very well because it was not made with functioning members of society in mind. I also did not make it autoupdate so it may quickly become useless.
 
